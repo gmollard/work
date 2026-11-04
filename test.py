@@ -1,22 +1,23 @@
+import pythoncom
 import win32com.client as wc
-ts = wc.GetActiveObject("COOLgen.Toolset")   # or Dispatch, same result for you
+
+ts = wc.GetActiveObject("COOLgen.Toolset")
 models = ts.Models
+ole = models._oleobj_
+
+print("typeinfo count:", ole.GetTypeInfoCount())
 print("Count:", models.Count)
 
-attempts = {
-    "Item(1)":      lambda: models.Item(1),
-    "Item(0)":      lambda: models.Item(0),
-    "models(1)":    lambda: models(1),
-    "iterate":      lambda: next(iter(models)),
+dispid = ole.GetIDsOfNames("Item")[0]
+modes = {
+    "METHOD":  pythoncom.DISPATCH_METHOD,
+    "PROPGET": pythoncom.DISPATCH_PROPERTYGET,
+    "BOTH":    pythoncom.DISPATCH_METHOD | pythoncom.DISPATCH_PROPERTYGET,
 }
-for label, fn in attempts.items():
-    try:
-        print(f"{label:10} ->", fn())
-    except Exception as e:
-        print(f"{label:10} failed:", e)
-
-# What the Models object actually exposes (invkind 1 = method, 2 = property get)
-ti = models._oleobj_.GetTypeInfo()
-for i in range(ti.GetTypeAttr().cFuncs):
-    fd = ti.GetFuncDesc(i)
-    print(ti.GetNames(fd.memid), "invkind", fd.invkind)
+for label, flags in modes.items():
+    for idx in (1, 0):
+        try:
+            r = ole.Invoke(dispid, 0, flags, 1, idx)
+            print(f"{label:8} Item({idx}) ->", repr(r))
+        except Exception as e:
+            print(f"{label:8} Item({idx}) failed:", e)
